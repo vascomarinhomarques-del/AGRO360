@@ -1,0 +1,20 @@
+{
+  "id": "./",
+  "name": "AGRO360 — Gestão Agrícola",
+  "short_name": "AGRO360",
+  "description": "Acompanha a tua exploração agrícola num só lugar.",
+  "lang": "pt-PT",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f7f8f4",
+  "theme_color": "#f7f8f4",
+  "icons": [
+    {
+      "src": "assets/images/logo.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
