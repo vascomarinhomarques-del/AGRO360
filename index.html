@@ -9,7 +9,7 @@
     <link rel="manifest" href="manifest.json">
     <link rel="icon" href="assets/images/logo.svg" type="image/svg+xml">
     <link rel="stylesheet" href="assets/css/styles.css">
-    <script type="module" src="assets/js/app.js"></script>
+    <script type="module" src="assets/js/bootstrap.js"></script>
   </head>
   <body>
     <div class="app-shell">
@@ -38,7 +38,7 @@
             <label class="search-box"><span data-icon="search"></span><input id="global-search" type="search" placeholder="Pesquisar..." aria-label="Pesquisar na página"><kbd>Ctrl K</kbd></label>
             <span class="topbar-divider" aria-hidden="true"></span>
             <button class="icon-button notification-button" type="button" aria-label="Notificações"><span data-icon="bell"></span><i aria-hidden="true"></i></button>
-            <div class="profile" aria-label="Perfil do gestor"><span class="avatar">AG</span><span class="profile-copy"><strong>Gestor</strong><small>Exploração</small></span><span class="profile-chevron" data-icon="chevron-down"></span></div>
+            <button class="profile" type="button" data-action="logout" aria-label="Terminar sessão" title="Terminar sessão"><span class="avatar" id="profile-initials">AG</span><span class="profile-copy"><strong id="profile-name">Gestor</strong><small id="profile-email">Exploração</small></span><span class="profile-chevron" data-icon="chevron-down"></span></button>
           </div>
         </header>
         <div class="page-content" id="app-content" aria-live="polite"></div>

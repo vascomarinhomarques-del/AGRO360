@@ -1,14 +1,18 @@
-const CACHE_NAME = 'agro360-shell-v1';
+const CACHE_NAME = 'agro360-shell-v2';
 const APP_SHELL = [
   './',
   './index.html',
+  './login.html',
   './pages/sobre.html',
   './pages/offline.html',
   './manifest.json',
   './assets/css/styles.css',
   './assets/images/logo.svg',
+  './assets/js/bootstrap.js',
   './assets/js/app.js',
-  './assets/js/modules/UI.js'
+  './assets/js/login.js',
+  './assets/js/modules/UI.js',
+  './assets/js/modules/auth.js'
 ];
 
 self.addEventListener('install', (event) => {

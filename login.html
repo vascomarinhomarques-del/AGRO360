@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="pt-PT">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#f7f8f4">
+    <meta name="description" content="Entra ou cria uma conta AGRO360 para gerir a tua exploração agrícola.">
+    <title>Entrar | AGRO360</title>
+    <link rel="icon" href="assets/images/logo.svg" type="image/svg+xml">
+    <link rel="stylesheet" href="assets/css/styles.css">
+    <script type="module" src="assets/js/login.js"></script>
+  </head>
+  <body class="auth-page">
+    <main class="auth-layout">
+      <a class="brand auth-brand" href="login.html" aria-label="AGRO360 — início">
+        <img src="assets/images/logo.svg" alt="" width="40" height="40">
+        <span class="brand-copy"><strong>AGRO<span>360</span></strong><small>GESTÃO AGRÍCOLA</small></span>
+      </a>
+      <section class="auth-card" aria-labelledby="auth-title">
+        <div class="auth-heading">
+          <span class="eyebrow">A TUA EXPLORAÇÃO, NUM SÓ LUGAR</span>
+          <h1 id="auth-title">Bem-vindo de volta</h1>
+          <p id="auth-description">Entra na tua conta para continuares a gerir a exploração.</p>
+        </div>
+        <p class="auth-message" id="auth-message" role="status" aria-live="polite"></p>
+        <div id="login-panel">
+          <form class="auth-form" id="login-form">
+            <label class="field-label" for="login-email">E-mail</label>
+            <input class="form-input" id="login-email" name="email" type="email" autocomplete="email" maxlength="254" placeholder="nome@exemplo.pt" required>
+            <label class="field-label" for="login-password">Palavra-passe</label>
+            <input class="form-input" id="login-password" name="password" type="password" autocomplete="current-password" required>
+            <button class="button button-primary auth-submit" type="submit">Entrar na aplicação</button>
+          </form>
+          <p class="auth-switch">Ainda não tens conta? <button class="auth-link" type="button" data-auth-view="register">Criar conta</button></p>
+        </div>
+        <div id="register-panel" hidden>
+          <form class="auth-form" id="register-form">
+            <label class="field-label" for="register-name">Nome</label>
+            <input class="form-input" id="register-name" name="name" autocomplete="name" maxlength="60" placeholder="O teu nome" required>
+            <label class="field-label" for="register-email">E-mail</label>
+            <input class="form-input" id="register-email" name="email" type="email" autocomplete="email" maxlength="254" placeholder="nome@exemplo.pt" required>
+            <label class="field-label" for="register-password">Palavra-passe</label>
+            <input class="form-input" id="register-password" name="password" type="password" autocomplete="new-password" minlength="8" aria-describedby="password-hint" required>
+            <small class="auth-hint" id="password-hint">Utiliza pelo menos 8 caracteres.</small>
+            <label class="field-label" for="register-confirm-password">Confirmar palavra-passe</label>
+            <input class="form-input" id="register-confirm-password" name="confirm-password" type="password" autocomplete="new-password" minlength="8" required>
+            <button class="button button-primary auth-submit" type="submit">Criar conta e entrar</button>
+          </form>
+          <p class="auth-switch">Já tens conta? <button class="auth-link" type="button" data-auth-view="login">Iniciar sessão</button></p>
+        </div>
+        <p class="auth-note">Esta versão guarda a conta apenas neste navegador. Não utilizes uma palavra-passe que uses noutros serviços.</p>
+      </section>
+      <p class="auth-footer">Feito para quem cultiva o futuro.</p>
+    </main>
+  </body>
+</html>
