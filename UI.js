@@ -1,3 +1,5 @@
+import { recordModules } from './records.js';
+
 const icons = {
   grid: '<rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/>',
   land: '<path d="M3 20h18M5 20V9l7-5 7 5v11M9 20v-6h6v6"/><path d="m3 9 9 5 9-5"/>',
@@ -11,7 +13,11 @@ const icons = {
   close: '<path d="m18 6-12 12M6 6l12 12"/>',
   plus: '<path d="M12 5v14m-7-7h14"/>',
   arrow: '<path d="M5 12h14m-7-7 7 7-7 7"/>',
-  sprout: '<path d="M12 22v-9m0 0C5 13 3 9 3 5c5 0 9 2 9 8Zm0-2c0-5 3-8 9-8 0 5-2 8-9 8Z"/>'
+  sprout: '<path d="M12 22v-9m0 0C5 13 3 9 3 5c5 0 9 2 9 8Zm0-2c0-5 3-8 9-8 0 5-2 8-9 8Z"/>',
+  machine: '<path d="M3 19h18M5 19v-5l4-3h6l4 3v5M9 11V7h5l3 4M3 14h3m12 0h3"/><circle cx="8" cy="19" r="2"/><circle cx="17" cy="19" r="2"/>',
+  animal: '<path d="M8 11c-2-2-5-1-5 2 0 2 2 3 4 2m9-4c2-2 5-1 5 2 0 2-2 3-4 2M8 11c0-3 2-5 4-5s4 2 4 5v5c0 3-2 5-4 5s-4-2-4-5z"/><path d="M10 14h.01M14 14h.01m-2 2v1"/>',
+  stock: '<path d="M3 7h18l-2 13H5L3 7Zm0 0 2-4h14l2 4M9 11v5m6-5v5"/>',
+  people: '<path d="M16 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2m16 0v-2a4 4 0 0 0-3-3.87M10 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm7-8a4 4 0 0 1 0 8"/>'
 };
 
 export function icon(name) {
@@ -98,6 +104,18 @@ function renderDashboard(state) {
       ${metric('calendar', 'blue', 'Tarefas pendentes', String(pending), 'tarefas', pendingToday ? `<span class="highlight">${pendingToday} ${pendingToday === 1 ? 'tarefa' : 'tarefas'} para hoje</span> na exploração` : 'Sem tarefas previstas para hoje')}
       ${metric('sprout', 'rose', 'Próxima colheita', '—', 'data', 'Previsão por registar')}
     </section>
+    <section class="module-shortcuts" aria-labelledby="module-shortcuts-title">
+      <div class="section-heading"><div><span class="eyebrow">GESTÃO DA EXPLORAÇÃO</span><h2 id="module-shortcuts-title">As tuas áreas</h2></div></div>
+      <div class="module-shortcuts-grid">${[
+        { id: 'maquinas', ...recordModules.maquinas },
+        { id: 'animais', ...recordModules.animais },
+        { id: 'exploracoes', title: 'Explorações', description: 'Talhões e terrenos', icon: 'land' },
+        { id: 'culturas', title: 'Culturas', description: 'Talhões e desenvolvimento', icon: 'leaf' },
+        { id: 'stock', ...recordModules.stock },
+        { id: 'funcionarios', ...recordModules.funcionarios },
+        { id: 'atividades', title: 'Atividades', description: 'Planeamento e tarefas', icon: 'calendar' }
+      ].map((module) => `<a class="module-shortcut" href="#${module.id}" data-view="${module.id}"><span class="module-shortcut-icon">${icon(module.icon)}</span><span class="module-shortcut-copy"><strong>${escapeHTML(module.title)}</strong><small>${escapeHTML(module.description)}</small></span><span class="module-shortcut-arrow">${icon('arrow')}</span></a>`).join('')}</div>
+    </section>
     <section class="dashboard-grid">
       <article class="panel"><div class="panel-header"><div><h2>Ritmo da exploração</h2><p>Atividades realizadas ao longo da semana</p></div><a class="text-link" href="#atividades" data-view="atividades">Ver atividades ${icon('arrow')}</a></div>${chart()}</article>
       <article class="panel"><div class="panel-header"><div><h2>Para fazer</h2><p>As próximas tarefas da tua lista</p></div><a class="text-link" href="#atividades" data-view="atividades">Ver todas ${icon('arrow')}</a></div><div class="tasks-list">${tasks.length ? tasks.map(taskRow).join('') : '<div class="empty-state"><strong>Tudo em dia!</strong>Não tens tarefas pendentes.</div>'}</div></article>
@@ -126,10 +144,39 @@ function renderActivities(state) {
     <section class="panel activity-panel"><div class="panel-header"><div><h2>Agenda da exploração</h2><p>${state.tasks.length} atividades registadas</p></div><span class="task-date">${state.tasks.filter((task) => !task.completed).length} pendentes</span></div>${rows || '<div class="empty-state">Ainda não tens atividades registadas.</div>'}</section>`;
 }
 
+function recordValue(moduleId, field, record) {
+  const value = record[field.name];
+  if (!value) return 'Não indicado';
+  if (moduleId === 'stock' && field.name === 'value') {
+    return `${Number(value).toLocaleString('pt-PT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €`;
+  }
+  if (moduleId === 'stock' && field.name === 'quantity') return `${value} ${record.unit}`;
+  return value;
+}
+
+function renderRecords(moduleId, state) {
+  const module = recordModules[moduleId];
+  const records = state.records[moduleId];
+  const entries = records.map((record) => {
+    const searchable = searchableText(...module.fields.map((field) => record[field.name]));
+    const details = module.fields.map((field) => `<div class="record-detail"><span>${escapeHTML(field.label)}</span><strong>${escapeHTML(recordValue(moduleId, field, record))}</strong></div>`).join('');
+    return `<article class="record-card" data-record-id="${escapeHTML(record.id)}" data-searchable="${escapeHTML(searchable)}">
+      <div class="record-card-content">${details}</div>
+      <div class="record-actions"><button class="button button-quiet" type="button" data-action="edit-record" data-module="${moduleId}">Editar</button><button class="button button-quiet record-delete" type="button" data-action="delete-record" data-module="${moduleId}">Eliminar</button></div>
+    </article>`;
+  }).join('');
+  return `${heading(module.eyebrow, module.title, module.description, `<button class="button button-primary" type="button" data-action="new-record" data-module="${moduleId}">${icon('plus')}Adicionar registo</button>`)}
+    <section class="records-section" aria-label="Registos de ${escapeHTML(module.title)}">
+      <div class="records-summary"><h2>Registos</h2><span>${records.length} ${records.length === 1 ? 'registo' : 'registos'}</span></div>
+      ${entries ? `<div class="records-grid">${entries}</div>` : '<div class="empty-state records-empty"><strong>Ainda sem registos</strong>Adiciona o primeiro registo desta área para começar.</div>'}
+    </section>`;
+}
+
 export function renderView(view, state) {
   if (view === 'exploracoes') return renderFields();
   if (view === 'culturas') return renderCrops();
   if (view === 'atividades') return renderActivities(state);
+  if (Object.hasOwn(recordModules, view)) return renderRecords(view, state);
   return renderDashboard(state);
 }
 

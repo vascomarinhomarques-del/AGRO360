@@ -1,5 +1,6 @@
-import { renderView, updateIcons } from './modules/UI.js';
+import { escapeHTML, renderView, updateIcons } from './modules/UI.js';
 import { getCurrentUser, signOut } from './modules/auth.js';
+import { loadRecords, recordModules, saveRecords } from './modules/records.js';
 
 const dateFormatter = new Intl.DateTimeFormat('pt-PT', { day: '2-digit', month: 'short' });
 
@@ -72,6 +73,8 @@ const storageKey = 'agro360.activities';
 const content = document.querySelector('#app-content');
 const modal = document.querySelector('#activity-modal');
 const form = document.querySelector('#activity-form');
+const recordModal = document.querySelector('#record-modal');
+const recordForm = document.querySelector('#record-form');
 const toast = document.querySelector('#toast');
 const currentUser = getCurrentUser();
 let activeView = 'dashboard';
@@ -111,7 +114,7 @@ function loadTasks() {
   }
 }
 
-const state = { tasks: loadTasks() };
+const state = { tasks: loadTasks(), records: loadRecords() };
 
 function saveTasks() {
   try {
@@ -131,10 +134,16 @@ function showToast(message) {
 }
 
 function setView(view) {
-  const allowed = ['dashboard', 'exploracoes', 'culturas', 'atividades'];
+  const allowed = ['dashboard', 'exploracoes', 'culturas', 'atividades', ...Object.keys(recordModules)];
   activeView = allowed.includes(view) ? view : 'dashboard';
   state.tasks.forEach(updateDueDateInfo);
-  const labels = { dashboard: 'Painel geral', exploracoes: 'Explorações', culturas: 'Culturas', atividades: 'Atividades' };
+  const labels = {
+    dashboard: 'Painel geral',
+    exploracoes: 'Explorações',
+    culturas: 'Culturas',
+    atividades: 'Atividades',
+    ...Object.fromEntries(Object.entries(recordModules).map(([id, module]) => [id, module.title]))
+  };
   document.querySelector('#current-section').textContent = labels[activeView];
   document.title = `${labels[activeView]} | AGRO360`;
   document.querySelectorAll('[data-view]').forEach((link) => {
@@ -184,6 +193,33 @@ function closeModal() {
   form.reset();
 }
 
+function openRecordModal(moduleId, record = null) {
+  const module = recordModules[moduleId];
+  if (!module) return;
+  document.querySelector('#record-modal-eyebrow').textContent = module.eyebrow;
+  document.querySelector('#record-modal-title').textContent = record ? `Editar ${module.title.toLocaleLowerCase('pt-PT')}` : `Novo registo de ${module.title.toLocaleLowerCase('pt-PT')}`;
+  recordForm.dataset.module = moduleId;
+  recordForm.innerHTML = `<input type="hidden" name="id" value="${record ? escapeHTML(record.id) : ''}">${module.fields.map((field) => {
+    const id = `record-${field.name}`;
+    const value = record ? record[field.name] : '';
+    const required = field.required === false ? '' : ' required';
+    const attributes = `${field.min ? ` min="${field.min}"` : ''}${field.step ? ` step="${field.step}"` : ''}${field.placeholder ? ` placeholder="${escapeHTML(field.placeholder)}"` : ''}`;
+    const control = field.type === 'select'
+      ? `<select class="form-input" id="${id}" name="${field.name}"${required}>${field.options.map((option) => `<option${value === option ? ' selected' : ''}>${option}</option>`).join('')}</select>`
+      : `<input class="form-input" id="${id}" name="${field.name}" type="${field.type || 'text'}"${attributes}${required} value="${escapeHTML(value)}">`;
+    return `<label class="field-label" for="${id}">${field.label}</label>${control}`;
+  }).join('')}<div class="dialog-actions"><button class="button button-quiet close-record-modal" type="button">Cancelar</button><button class="button button-primary" type="submit">${record ? 'Guardar alterações' : 'Adicionar registo'}</button></div>`;
+  recordModal.hidden = false;
+  recordForm.querySelector('input:not([type="hidden"]), select')?.focus();
+  updateIcons(recordModal);
+}
+
+function closeRecordModal() {
+  recordModal.hidden = true;
+  recordForm.reset();
+  delete recordForm.dataset.module;
+}
+
 document.addEventListener('click', (event) => {
   const viewLink = event.target.closest('[data-view]');
   if (viewLink) {
@@ -196,8 +232,36 @@ document.addEventListener('click', (event) => {
     openModal();
     return;
   }
+  const newRecordButton = event.target.closest('[data-action="new-record"]');
+  if (newRecordButton) {
+    openRecordModal(newRecordButton.dataset.module);
+    return;
+  }
+  const editRecordButton = event.target.closest('[data-action="edit-record"]');
+  if (editRecordButton) {
+    const record = state.records[editRecordButton.dataset.module]?.find((item) => item.id === editRecordButton.closest('[data-record-id]')?.dataset.recordId);
+    if (record) openRecordModal(editRecordButton.dataset.module, record);
+    return;
+  }
+  const deleteRecordButton = event.target.closest('[data-action="delete-record"]');
+  if (deleteRecordButton) {
+    const moduleId = deleteRecordButton.dataset.module;
+    const row = deleteRecordButton.closest('[data-record-id]');
+    const record = state.records[moduleId]?.find((item) => item.id === row?.dataset.recordId);
+    if (record && window.confirm('Queres eliminar este registo? Esta ação não pode ser desfeita.')) {
+      state.records[moduleId] = state.records[moduleId].filter((item) => item.id !== record.id);
+      const saved = saveRecords(state.records);
+      setView(activeView);
+      showToast(saved ? 'Registo eliminado.' : 'Registo eliminado, mas não foi possível guardá-lo.');
+    }
+    return;
+  }
   if (event.target.closest('.close-modal') || event.target === modal) {
     closeModal();
+    return;
+  }
+  if (event.target.closest('.close-record-modal') || event.target === recordModal) {
+    closeRecordModal();
     return;
   }
   if (event.target.closest('.notification-button')) showToast('Não tens notificações novas.');
@@ -251,6 +315,32 @@ form.addEventListener('submit', (event) => {
   showToast(saved ? 'Nova atividade adicionada.' : 'Atividade adicionada, mas não foi possível guardá-la.');
 });
 
+recordForm.addEventListener('submit', (event) => {
+  event.preventDefault();
+  if (!recordForm.reportValidity()) return;
+  const moduleId = recordForm.dataset.module;
+  const module = recordModules[moduleId];
+  if (!module) {
+    showToast('Não foi possível identificar a área deste registo.');
+    return;
+  }
+
+  const values = new FormData(recordForm);
+  const id = String(values.get('id')) || globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  const record = Object.fromEntries([
+    ['id', id],
+    ...module.fields.map((field) => [field.name, String(values.get(field.name) || '').trim()])
+  ]);
+  const existingIndex = state.records[moduleId].findIndex((item) => item.id === id);
+  if (existingIndex === -1) state.records[moduleId].unshift(record);
+  else state.records[moduleId][existingIndex] = record;
+
+  const saved = saveRecords(state.records);
+  closeRecordModal();
+  setView(moduleId);
+  showToast(saved ? (existingIndex === -1 ? 'Registo adicionado.' : 'Registo atualizado.') : 'Alteração aplicada, mas não foi possível guardá-la.');
+});
+
 document.querySelector('#global-search').addEventListener('input', (event) => filterSearch(event.target.value));
 document.addEventListener('keydown', (event) => {
   if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
@@ -258,6 +348,7 @@ document.addEventListener('keydown', (event) => {
     document.querySelector('#global-search').focus();
   }
   if (event.key === 'Escape' && !modal.hidden) closeModal();
+  if (event.key === 'Escape' && !recordModal.hidden) closeRecordModal();
 });
 
 updateIcons();
