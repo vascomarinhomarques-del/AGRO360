@@ -1,6 +1,7 @@
 import { escapeHTML, renderView, updateIcons } from './modules/UI.js';
 import { getCurrentUser, signOut } from './modules/auth.js';
 import { loadRecords, recordModules, saveRecords } from './modules/records.js';
+import { loadFields, saveFields } from './modules/fields.js';
 
 const dateFormatter = new Intl.DateTimeFormat('pt-PT', { day: '2-digit', month: 'short' });
 
@@ -75,6 +76,8 @@ const modal = document.querySelector('#activity-modal');
 const form = document.querySelector('#activity-form');
 const recordModal = document.querySelector('#record-modal');
 const recordForm = document.querySelector('#record-form');
+const fieldModal = document.querySelector('#field-modal');
+const fieldForm = document.querySelector('#field-form');
 const toast = document.querySelector('#toast');
 const currentUser = getCurrentUser();
 let activeView = 'dashboard';
@@ -114,7 +117,7 @@ function loadTasks() {
   }
 }
 
-const state = { tasks: loadTasks(), records: loadRecords() };
+const state = { tasks: loadTasks(), records: loadRecords(), fields: loadFields() };
 
 function saveTasks() {
   try {
@@ -181,6 +184,7 @@ function filterSearch(query) {
 }
 
 function openModal() {
+  updateActivityFieldOptions();
   modal.hidden = false;
   const now = new Date();
   const localDate = new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
@@ -188,9 +192,31 @@ function openModal() {
   document.querySelector('#activity-name').focus();
 }
 
+function updateActivityFieldOptions() {
+  const select = document.querySelector('#activity-field');
+  const selectedField = select.value;
+  select.replaceChildren(...state.fields.map((field) => {
+    const option = document.createElement('option');
+    option.value = field.name;
+    option.textContent = field.name;
+    return option;
+  }));
+  if (state.fields.some((field) => field.name === selectedField)) select.value = selectedField;
+}
+
 function closeModal() {
   modal.hidden = true;
   form.reset();
+}
+
+function openFieldModal() {
+  fieldModal.hidden = false;
+  document.querySelector('#field-name').focus();
+}
+
+function closeFieldModal() {
+  fieldModal.hidden = true;
+  fieldForm.reset();
 }
 
 function openRecordModal(moduleId, record = null) {
@@ -232,6 +258,10 @@ document.addEventListener('click', (event) => {
     openModal();
     return;
   }
+  if (event.target.closest('[data-action="new-field"]')) {
+    openFieldModal();
+    return;
+  }
   const newRecordButton = event.target.closest('[data-action="new-record"]');
   if (newRecordButton) {
     openRecordModal(newRecordButton.dataset.module);
@@ -258,6 +288,10 @@ document.addEventListener('click', (event) => {
   }
   if (event.target.closest('.close-modal') || event.target === modal) {
     closeModal();
+    return;
+  }
+  if (event.target.closest('.close-field-modal') || event.target === fieldModal) {
+    closeFieldModal();
     return;
   }
   if (event.target.closest('.close-record-modal') || event.target === recordModal) {
@@ -315,6 +349,35 @@ form.addEventListener('submit', (event) => {
   showToast(saved ? 'Nova atividade adicionada.' : 'Atividade adicionada, mas não foi possível guardá-la.');
 });
 
+fieldForm.addEventListener('submit', (event) => {
+  event.preventDefault();
+  if (!fieldForm.reportValidity()) return;
+
+  const values = new FormData(fieldForm);
+  const name = String(values.get('name')).trim();
+  if (state.fields.some((field) => field.name.toLocaleLowerCase('pt-PT') === name.toLocaleLowerCase('pt-PT'))) {
+    showToast('Já existe uma exploração com esse nome.');
+    document.querySelector('#field-name').focus();
+    return;
+  }
+
+  const area = Number(values.get('area'));
+  state.fields.push({
+    id: globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+    name,
+    place: String(values.get('place')).trim(),
+    area: `${area.toLocaleString('pt-PT', { maximumFractionDigits: 2 })} ha`,
+    crop: String(values.get('crop')).trim() || 'Por definir',
+    status: String(values.get('status')),
+    tone: ''
+  });
+  const saved = saveFields(state.fields);
+  updateActivityFieldOptions();
+  closeFieldModal();
+  setView('exploracoes');
+  showToast(saved ? 'Nova exploração adicionada.' : 'Exploração adicionada, mas não foi possível guardá-la.');
+});
+
 recordForm.addEventListener('submit', (event) => {
   event.preventDefault();
   if (!recordForm.reportValidity()) return;
@@ -349,6 +412,7 @@ document.addEventListener('keydown', (event) => {
   }
   if (event.key === 'Escape' && !modal.hidden) closeModal();
   if (event.key === 'Escape' && !recordModal.hidden) closeRecordModal();
+  if (event.key === 'Escape' && !fieldModal.hidden) closeFieldModal();
 });
 
 updateIcons();
