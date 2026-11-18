@@ -1,7 +1,8 @@
-import { escapeHTML, renderView, updateIcons } from './modules/UI.js';
+import { escapeHTML, icon, renderView, updateIcons } from './modules/UI.js';
 import { getCurrentUser, signOut } from './modules/auth.js';
 import { loadRecords, recordModules, saveRecords } from './modules/records.js';
 import { loadFields, saveFields } from './modules/fields.js';
+import { getCurrentWeather, refreshInterval, requestTimeout } from './modules/weather.js';
 
 const dateFormatter = new Intl.DateTimeFormat('pt-PT', { day: '2-digit', month: 'short' });
 
@@ -58,7 +59,7 @@ function updateDueDateInfo(task) {
 function createTask(id, name, field, daysFromNow, completed = false) {
   const dueDate = new Date();
   dueDate.setDate(dueDate.getDate() + daysFromNow);
-  return updateDueDateInfo({ id, name, field, dueDate: dateKey(dueDate), completed });
+  return updateDueDateInfo({ id, name, field, dueDate: dateKey(dueDate), completed, demo: true });
 }
 
 const initialTasks = [
@@ -82,6 +83,8 @@ const toast = document.querySelector('#toast');
 const currentUser = getCurrentUser();
 let activeView = 'dashboard';
 let toastTimer;
+let weatherRequestId = 0;
+let weatherController = null;
 
 if (currentUser) {
   const initials = currentUser.name.trim().split(/\s+/).slice(0, 2).map((part) => part[0]).join('').toLocaleUpperCase('pt-PT');
@@ -100,6 +103,7 @@ function loadTasks() {
       && typeof task.name === 'string'
       && typeof task.field === 'string'
       && typeof task.completed === 'boolean'
+      && (task.demo === undefined || typeof task.demo === 'boolean')
       && (isDateKey(task.dueDate) || (typeof task.dueLabel === 'string' && typeof task.today === 'boolean')))) {
       throw new Error('Os dados guardados das atividades não têm o formato esperado.');
     }
@@ -117,7 +121,8 @@ function loadTasks() {
   }
 }
 
-const state = { tasks: loadTasks(), records: loadRecords(), fields: loadFields() };
+const state = { tasks: loadTasks(), records: loadRecords(), fields: loadFields(), weatherFieldId: '' };
+state.weatherFieldId = state.fields[0]?.id || '';
 
 function saveTasks() {
   try {
@@ -136,9 +141,64 @@ function showToast(message) {
   toastTimer = window.setTimeout(() => toast.classList.remove('is-visible'), 2600);
 }
 
+async function refreshWeather() {
+  const fieldSelect = document.querySelector('#weather-field');
+  if (!fieldSelect) return;
+
+  const field = state.fields.find((item) => item.id === fieldSelect.value);
+  const temperature = document.querySelector('#weather-temperature');
+  const condition = document.querySelector('#weather-condition');
+  const precipitation = document.querySelector('#weather-precipitation');
+  const updated = document.querySelector('#weather-updated');
+  const refreshButton = document.querySelector('#weather-refresh');
+  if (!field) {
+    condition.textContent = 'Adiciona uma exploração para consultar a meteorologia.';
+    return;
+  }
+
+  weatherController?.abort();
+  const controller = new AbortController();
+  weatherController = controller;
+  const requestId = ++weatherRequestId;
+  const timeout = window.setTimeout(() => controller.abort(), requestTimeout);
+  refreshButton.disabled = true;
+  condition.textContent = 'A atualizar…';
+  updated.textContent = 'A consultar dados atuais';
+
+  try {
+    const weather = await getCurrentWeather(field.place, controller.signal);
+    if (requestId !== weatherRequestId) return;
+    temperature.textContent = `${weather.temperature}°C`;
+    condition.textContent = weather.description;
+    precipitation.textContent = weather.precipitationProbability === null
+      ? '—%'
+      : `${weather.precipitationProbability}%`;
+    document.querySelector('#weather-icon').innerHTML = icon(weather.icon);
+    updated.textContent = `Dados às ${weather.validAt}`;
+  } catch (error) {
+    if (requestId !== weatherRequestId) return;
+    console.error('Não foi possível atualizar a meteorologia.', error);
+    condition.textContent = error.name === 'AbortError'
+      ? 'A meteorologia demorou demasiado tempo a responder.'
+      : error instanceof TypeError
+        ? 'Não foi possível ligar ao serviço meteorológico.'
+        : error.message || 'Meteorologia indisponível. Tenta novamente.';
+    updated.textContent = 'Verifica a ligação à internet';
+  } finally {
+    window.clearTimeout(timeout);
+    if (requestId === weatherRequestId) {
+      refreshButton.disabled = false;
+      weatherController = null;
+    }
+  }
+}
+
 function setView(view) {
   const allowed = ['dashboard', 'exploracoes', 'culturas', 'atividades', ...Object.keys(recordModules)];
   activeView = allowed.includes(view) ? view : 'dashboard';
+  if (!state.fields.some((field) => field.id === state.weatherFieldId)) {
+    state.weatherFieldId = state.fields[0]?.id || '';
+  }
   state.tasks.forEach(updateDueDateInfo);
   const labels = {
     dashboard: 'Painel geral',
@@ -163,6 +223,7 @@ function setView(view) {
   document.querySelector('#pending-count').hidden = pendingCount === 0;
   const search = document.querySelector('#global-search');
   if (search.value) filterSearch(search.value);
+  if (activeView === 'dashboard') refreshWeather();
 }
 
 function filterSearch(query) {
@@ -183,13 +244,16 @@ function filterSearch(query) {
   }
 }
 
-function openModal() {
+function openModal(task = null) {
   updateActivityFieldOptions();
+  document.querySelector('#modal-title').textContent = task ? 'Editar atividade' : 'Nova atividade';
+  form.querySelector('[type="submit"]').innerHTML = `${icon('plus')}${task ? 'Guardar alterações' : 'Adicionar atividade'}`;
+  form.elements.id.value = task?.id || '';
+  form.elements.name.value = task?.name || '';
+  form.elements.field.value = task?.field || state.fields[0]?.name || '';
   modal.hidden = false;
-  const now = new Date();
-  const localDate = new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
-  document.querySelector('#activity-date').value = localDate;
-  document.querySelector('#activity-name').focus();
+  form.elements.date.value = task?.dueDate || dateKey(new Date());
+  form.elements.name.focus();
 }
 
 function updateActivityFieldOptions() {
@@ -207,31 +271,73 @@ function updateActivityFieldOptions() {
 function closeModal() {
   modal.hidden = true;
   form.reset();
+  document.querySelector('#modal-title').textContent = 'Nova atividade';
+  form.querySelector('[type="submit"]').innerHTML = `${icon('plus')}Adicionar atividade`;
 }
 
-function openFieldModal() {
+function openFieldModal(field = null) {
+  const values = fieldForm.elements;
+  document.querySelector('#field-modal-title').textContent = field ? 'Editar exploração' : 'Nova exploração';
+  fieldForm.querySelector('[type="submit"]').innerHTML = `${icon('plus')}${field ? 'Guardar alterações' : 'Adicionar exploração'}`;
+  values.id.value = field?.id || '';
+  values.name.value = field?.name || '';
+  values.place.value = field?.place || '';
+  values.area.value = field ? Number.parseFloat(field.area.replace(',', '.')) : '';
+  values.crop.value = field?.crop === 'Por definir' ? '' : (field?.crop || '');
+  values.status.value = field?.status || 'Saudável';
   fieldModal.hidden = false;
-  document.querySelector('#field-name').focus();
+  values.name.focus();
 }
 
 function closeFieldModal() {
   fieldModal.hidden = true;
   fieldForm.reset();
+  document.querySelector('#field-modal-title').textContent = 'Nova exploração';
+  fieldForm.querySelector('[type="submit"]').innerHTML = `${icon('plus')}Adicionar exploração`;
 }
 
 function openRecordModal(moduleId, record = null) {
   const module = recordModules[moduleId];
   if (!module) return;
+  const fields = module.fields.map((field) => {
+    if (field.optionSource === 'fields') {
+      return { ...field, options: state.fields.map((item) => ({ value: item.id, label: item.name })) };
+    }
+    if (field.optionSource === 'parcels') {
+      return {
+        ...field,
+        options: state.records.parcelas.map((item) => {
+          const owner = state.fields.find((property) => property.id === item.fieldId);
+          return { value: item.id, label: `${item.name}${owner ? ` · ${owner.name}` : ''}` };
+        })
+      };
+    }
+    return field;
+  });
+  const unavailableRelation = fields.find((field) => field.optionSource && field.options.length === 0);
+  if (unavailableRelation) {
+    showToast(unavailableRelation.optionSource === 'fields'
+      ? 'Regista primeiro uma exploração para adicionar parcelas.'
+      : 'Regista primeiro uma parcela nesta exploração.');
+    setView(unavailableRelation.optionSource === 'fields' ? 'exploracoes' : 'parcelas');
+    return;
+  }
   document.querySelector('#record-modal-eyebrow').textContent = module.eyebrow;
   document.querySelector('#record-modal-title').textContent = record ? `Editar ${module.title.toLocaleLowerCase('pt-PT')}` : `Novo registo de ${module.title.toLocaleLowerCase('pt-PT')}`;
   recordForm.dataset.module = moduleId;
-  recordForm.innerHTML = `<input type="hidden" name="id" value="${record ? escapeHTML(record.id) : ''}">${module.fields.map((field) => {
+  recordForm.innerHTML = `<input type="hidden" name="id" value="${record ? escapeHTML(record.id) : ''}">${fields.map((field) => {
     const id = `record-${field.name}`;
     const value = record ? record[field.name] : '';
     const required = field.required === false ? '' : ' required';
     const attributes = `${field.min ? ` min="${field.min}"` : ''}${field.step ? ` step="${field.step}"` : ''}${field.placeholder ? ` placeholder="${escapeHTML(field.placeholder)}"` : ''}`;
     const control = field.type === 'select'
-      ? `<select class="form-input" id="${id}" name="${field.name}"${required}>${field.options.map((option) => `<option${value === option ? ' selected' : ''}>${option}</option>`).join('')}</select>`
+      ? `<select class="form-input" id="${id}" name="${field.name}"${required}>${field.optionSource ? `<option value=""${value ? '' : ' selected'} disabled>Seleciona uma opção</option>` : ''}${field.options.map((option) => {
+        const optionValue = typeof option === 'string' ? option : option.value;
+        const optionLabel = typeof option === 'string' ? option : option.label;
+        return `<option value="${escapeHTML(optionValue)}"${value === optionValue ? ' selected' : ''}>${escapeHTML(optionLabel)}</option>`;
+      }).join('')}</select>`
+      : field.type === 'textarea'
+        ? `<textarea class="form-input form-textarea" id="${id}" name="${field.name}"${required}${attributes}>${escapeHTML(value)}</textarea>`
       : `<input class="form-input" id="${id}" name="${field.name}" type="${field.type || 'text'}"${attributes}${required} value="${escapeHTML(value)}">`;
     return `<label class="field-label" for="${id}">${field.label}</label>${control}`;
   }).join('')}<div class="dialog-actions"><button class="button button-quiet close-record-modal" type="button">Cancelar</button><button class="button button-primary" type="submit">${record ? 'Guardar alterações' : 'Adicionar registo'}</button></div>`;
@@ -258,6 +364,27 @@ document.addEventListener('click', (event) => {
     openModal();
     return;
   }
+  const editTaskButton = event.target.closest('[data-action="edit-task"]');
+  if (editTaskButton) {
+    const task = state.tasks.find((item) => item.id === editTaskButton.closest('[data-task-id]')?.dataset.taskId);
+    if (task) openModal(task);
+    return;
+  }
+  const deleteTaskButton = event.target.closest('[data-action="delete-task"]');
+  if (deleteTaskButton) {
+    const task = state.tasks.find((item) => item.id === deleteTaskButton.closest('[data-task-id]')?.dataset.taskId);
+    if (task && window.confirm('Queres eliminar esta atividade?')) {
+      state.tasks = state.tasks.filter((item) => item.id !== task.id);
+      const saved = saveTasks();
+      setView('atividades');
+      showToast(saved ? 'Atividade eliminada.' : 'Atividade eliminada, mas não foi possível guardá-la.');
+    }
+    return;
+  }
+  if (event.target.closest('#weather-refresh')) {
+    refreshWeather();
+    return;
+  }
   if (event.target.closest('[data-action="new-field"]')) {
     openFieldModal();
     return;
@@ -273,12 +400,41 @@ document.addEventListener('click', (event) => {
     if (record) openRecordModal(editRecordButton.dataset.module, record);
     return;
   }
+  const editFieldButton = event.target.closest('[data-action="edit-field"]');
+  if (editFieldButton) {
+    const field = state.fields.find((item) => item.id === editFieldButton.dataset.fieldId);
+    if (field) openFieldModal(field);
+    return;
+  }
+  const deleteFieldButton = event.target.closest('[data-action="delete-field"]');
+  if (deleteFieldButton) {
+    const field = state.fields.find((item) => item.id === deleteFieldButton.dataset.fieldId);
+    if (field) {
+      const hasParcels = state.records.parcelas.some((parcel) => parcel.fieldId === field.id);
+      const hasTasks = state.tasks.some((task) => task.field === field.name);
+      if (hasParcels || hasTasks) {
+        showToast('Não é possível eliminar esta exploração enquanto tiver parcelas ou tarefas associadas.');
+      } else if (window.confirm(`Queres eliminar a exploração "${field.name}"?`)) {
+        state.fields = state.fields.filter((item) => item.id !== field.id);
+        const saved = saveFields(state.fields);
+        updateActivityFieldOptions();
+        setView('exploracoes');
+        showToast(saved ? 'Exploração eliminada.' : 'Exploração eliminada, mas não foi possível guardá-la.');
+      }
+    }
+    return;
+  }
   const deleteRecordButton = event.target.closest('[data-action="delete-record"]');
   if (deleteRecordButton) {
     const moduleId = deleteRecordButton.dataset.module;
     const row = deleteRecordButton.closest('[data-record-id]');
     const record = state.records[moduleId]?.find((item) => item.id === row?.dataset.recordId);
-    if (record && window.confirm('Queres eliminar este registo? Esta ação não pode ser desfeita.')) {
+    const hasDependencies = moduleId === 'parcelas' && record
+      && Object.keys(recordModules).some((relatedModule) => relatedModule !== 'parcelas'
+        && state.records[relatedModule].some((item) => item.parcelId === record.id));
+    if (record && hasDependencies) {
+      showToast('Não é possível eliminar esta parcela enquanto tiver culturas, registos ou movimentos financeiros associados.');
+    } else if (record && window.confirm('Queres eliminar este registo? Esta ação não pode ser desfeita.')) {
       state.records[moduleId] = state.records[moduleId].filter((item) => item.id !== record.id);
       const saved = saveRecords(state.records);
       setView(activeView);
@@ -313,6 +469,11 @@ document.addEventListener('click', (event) => {
 window.addEventListener('popstate', () => setView(location.hash.slice(1)));
 
 document.addEventListener('change', (event) => {
+  if (event.target.matches('#weather-field')) {
+    state.weatherFieldId = event.target.value;
+    refreshWeather();
+    return;
+  }
   if (!event.target.matches('.task-check')) return;
   const row = event.target.closest('[data-task-id]');
   const task = state.tasks.find((item) => item.id === row?.dataset.taskId);
@@ -331,22 +492,27 @@ form.addEventListener('submit', (event) => {
   event.preventDefault();
   if (!form.reportValidity()) return;
   const values = new FormData(form);
+  const id = String(values.get('id'));
   const dueDate = String(values.get('date'));
   if (!isDateKey(dueDate)) {
     showToast('A data indicada não é válida.');
     return;
   }
-  state.tasks.unshift(updateDueDateInfo({
-    id: globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+  const updatedTask = updateDueDateInfo({
+    id: id || globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(16).slice(2)}`,
     name: String(values.get('name')).trim(),
     field: String(values.get('field')),
     dueDate,
-    completed: false
-  }));
+    completed: id ? state.tasks.find((task) => task.id === id)?.completed ?? false : false,
+    demo: false
+  });
+  const existingIndex = state.tasks.findIndex((task) => task.id === id);
+  if (existingIndex < 0) state.tasks.unshift(updatedTask);
+  else state.tasks[existingIndex] = updatedTask;
   const saved = saveTasks();
   closeModal();
   setView('atividades');
-  showToast(saved ? 'Nova atividade adicionada.' : 'Atividade adicionada, mas não foi possível guardá-la.');
+  showToast(saved ? (id ? 'Atividade atualizada.' : 'Nova atividade adicionada.') : 'Alteração aplicada, mas não foi possível guardá-la.');
 });
 
 fieldForm.addEventListener('submit', (event) => {
@@ -354,28 +520,43 @@ fieldForm.addEventListener('submit', (event) => {
   if (!fieldForm.reportValidity()) return;
 
   const values = new FormData(fieldForm);
+  const id = String(values.get('id'));
   const name = String(values.get('name')).trim();
-  if (state.fields.some((field) => field.name.toLocaleLowerCase('pt-PT') === name.toLocaleLowerCase('pt-PT'))) {
+  if (state.fields.some((field) => field.id !== id && field.name.toLocaleLowerCase('pt-PT') === name.toLocaleLowerCase('pt-PT'))) {
     showToast('Já existe uma exploração com esse nome.');
     document.querySelector('#field-name').focus();
     return;
   }
 
   const area = Number(values.get('area'));
-  state.fields.push({
-    id: globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+  const updatedField = {
+    id: id || globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(16).slice(2)}`,
     name,
     place: String(values.get('place')).trim(),
     area: `${area.toLocaleString('pt-PT', { maximumFractionDigits: 2 })} ha`,
     crop: String(values.get('crop')).trim() || 'Por definir',
     status: String(values.get('status')),
-    tone: ''
-  });
+    tone: '',
+    demo: false
+  };
+  const existingIndex = state.fields.findIndex((field) => field.id === id);
+  let tasksSaved = true;
+  if (existingIndex < 0) state.fields.push(updatedField);
+  else {
+    const oldName = state.fields[existingIndex].name;
+    state.fields[existingIndex] = updatedField;
+    state.tasks.forEach((task) => {
+      if (task.field === oldName) task.field = name;
+    });
+    tasksSaved = saveTasks();
+  }
   const saved = saveFields(state.fields);
   updateActivityFieldOptions();
   closeFieldModal();
   setView('exploracoes');
-  showToast(saved ? 'Nova exploração adicionada.' : 'Exploração adicionada, mas não foi possível guardá-la.');
+  if (!saved) showToast('Alteração aplicada, mas não foi possível guardá-la.');
+  else if (!tasksSaved) showToast('Exploração atualizada, mas não foi possível guardar o nome nas tarefas.');
+  else showToast(id ? 'Exploração atualizada.' : 'Nova exploração adicionada.');
 });
 
 recordForm.addEventListener('submit', (event) => {
@@ -417,6 +598,9 @@ document.addEventListener('keydown', (event) => {
 
 updateIcons();
 setView(location.hash.slice(1));
+window.setInterval(() => {
+  if (!document.hidden) refreshWeather();
+}, refreshInterval);
 
 if ('serviceWorker' in navigator && location.protocol !== 'file:') {
   navigator.serviceWorker.register('./sw.js').catch((error) => {

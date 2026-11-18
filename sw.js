@@ -1,4 +1,4 @@
-const CACHE_NAME = 'agro360-shell-v6';
+const CACHE_NAME = 'agro360-shell-v14';
 const APP_SHELL = [
   './',
   './index.html',
@@ -14,7 +14,8 @@ const APP_SHELL = [
   './assets/js/modules/UI.js',
   './assets/js/modules/records.js',
   './assets/js/modules/fields.js',
-  './assets/js/modules/auth.js'
+  './assets/js/modules/auth.js',
+  './assets/js/modules/weather.js'
 ];
 
 self.addEventListener('install', (event) => {

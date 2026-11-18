@@ -48,6 +48,58 @@ export const recordModules = {
       { name: 'task', label: 'Tarefa atribuída', placeholder: 'Ex.: Inspecionar o olival' },
       { name: 'status', label: 'Estado da tarefa', type: 'select', options: ['Pendente', 'Em curso', 'Concluída'] }
     ]
+  },
+  parcelas: {
+    title: 'Parcelas',
+    eyebrow: 'TERRENOS E TALHÕES',
+    description: 'Organiza as parcelas e associa-as à exploração correspondente.',
+    icon: 'land',
+    fields: [
+      { name: 'name', label: 'Nome da parcela', placeholder: 'Ex.: Olival Norte' },
+      { name: 'fieldId', label: 'Exploração', type: 'select', optionSource: 'fields' },
+      { name: 'area', label: 'Área (hectares)', type: 'number', min: '0.01', step: '0.01' },
+      { name: 'crop', label: 'Cultura principal', placeholder: 'Ex.: Oliveira', required: false }
+    ]
+  },
+  culturas: {
+    title: 'Culturas',
+    eyebrow: 'CADERNO DE CAMPO',
+    description: 'Regista culturas, datas de plantação e produção prevista por parcela.',
+    icon: 'leaf',
+    fields: [
+      { name: 'name', label: 'Nome da cultura', placeholder: 'Ex.: Trigo' },
+      { name: 'type', label: 'Tipo ou variedade', placeholder: 'Ex.: Cevada dística' },
+      { name: 'parcelId', label: 'Parcela', type: 'select', optionSource: 'parcels' },
+      { name: 'plantingDate', label: 'Data de plantação', type: 'date' },
+      { name: 'status', label: 'Estado', type: 'select', options: ['Planeada', 'Em crescimento', 'Pronta para colheita', 'Colhida'] },
+      { name: 'expectedProduction', label: 'Produção prevista', placeholder: 'Ex.: 2 toneladas', required: false }
+    ]
+  },
+  caderno: {
+    title: 'Caderno de campo',
+    eyebrow: 'REGISTO AGRÍCOLA',
+    description: 'Regista intervenções e observações associadas a cada parcela.',
+    icon: 'calendar',
+    fields: [
+      { name: 'parcelId', label: 'Parcela', type: 'select', optionSource: 'parcels' },
+      { name: 'date', label: 'Data', type: 'date' },
+      { name: 'activity', label: 'Atividade realizada', placeholder: 'Ex.: Tratamento fitossanitário' },
+      { name: 'observations', label: 'Observações', type: 'textarea', required: false }
+    ]
+  },
+  financas: {
+    title: 'Custos e receitas',
+    eyebrow: 'GESTÃO FINANCEIRA',
+    description: 'Regista movimentos financeiros e associa-os às parcelas.',
+    icon: 'stock',
+    fields: [
+      { name: 'type', label: 'Tipo de movimento', type: 'select', options: ['Despesa', 'Receita'] },
+      { name: 'category', label: 'Categoria', placeholder: 'Ex.: Sementes, venda de produção' },
+      { name: 'parcelId', label: 'Parcela', type: 'select', optionSource: 'parcels' },
+      { name: 'date', label: 'Data', type: 'date' },
+      { name: 'value', label: 'Valor (€)', type: 'number', min: '0.01', step: '0.01' },
+      { name: 'description', label: 'Descrição', type: 'textarea', required: false }
+    ]
   }
 };
 
@@ -81,10 +133,11 @@ export function loadRecords() {
     throw new Error('Os registos guardados estão inválidos. Os dados não foram alterados.', { cause: error });
   }
   if (!records || typeof records !== 'object' || Array.isArray(records)
-    || !Object.keys(recordModules).every((id) => Array.isArray(records[id]) && records[id].every((record) => isRecord(record, id)))) {
+    || !Object.entries(records).every(([id, entries]) => !recordModules[id]
+      || (Array.isArray(entries) && entries.every((record) => isRecord(record, id))))) {
     throw new Error('Os registos guardados não têm o formato esperado. Os dados não foram alterados.');
   }
-  return records;
+  return { ...emptyRecords(), ...records };
 }
 
 export function saveRecords(records) {

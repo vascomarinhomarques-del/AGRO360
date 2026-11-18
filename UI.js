@@ -14,6 +14,11 @@ const icons = {
   plus: '<path d="M12 5v14m-7-7h14"/>',
   arrow: '<path d="M5 12h14m-7-7 7 7-7 7"/>',
   sprout: '<path d="M12 22v-9m0 0C5 13 3 9 3 5c5 0 9 2 9 8Zm0-2c0-5 3-8 9-8 0 5-2 8-9 8Z"/>',
+  cloud: '<path d="M20 16.2A4.5 4.5 0 0 0 18.5 7.5 6 6 0 0 0 7 9a4 4 0 0 0 .5 8H19"/>',
+  rain: '<path d="M20 13.2A4.5 4.5 0 0 0 18.5 4.5 6 6 0 0 0 7 6a4 4 0 0 0 .5 8H19"/><path d="m8 17-1 3m6-3-1 3m6-3-1 3"/>',
+  snow: '<path d="M20 13.2A4.5 4.5 0 0 0 18.5 4.5 6 6 0 0 0 7 6a4 4 0 0 0 .5 8H19"/><path d="M8 17v4m-2-2h4m-2-2 2 2-2 2m7-4v4m-2-2h4m-2-2 2 2-2 2"/>',
+  storm: '<path d="M20 13.2A4.5 4.5 0 0 0 18.5 4.5 6 6 0 0 0 7 6a4 4 0 0 0 .5 8H19"/><path d="m13 14-3 5h4l-2 4"/>',
+  refresh: '<path d="M20 7v5h-5M4 17v-5h5"/><path d="M5.6 9a7 7 0 0 1 11.6-2L20 12M4 12l2.8 5a7 7 0 0 0 11.6-2"/>',
   machine: '<path d="M3 19h18M5 19v-5l4-3h6l4 3v5M9 11V7h5l3 4M3 14h3m12 0h3"/><circle cx="8" cy="19" r="2"/><circle cx="17" cy="19" r="2"/>',
   animal: '<path d="M8 11c-2-2-5-1-5 2 0 2 2 3 4 2m9-4c2-2 5-1 5 2 0 2-2 3-4 2M8 11c0-3 2-5 4-5s4 2 4 5v5c0 3-2 5-4 5s-4-2-4-5z"/><path d="M10 14h.01M14 14h.01m-2 2v1"/>',
   stock: '<path d="M3 7h18l-2 13H5L3 7Zm0 0 2-4h14l2 4M9 11v5m6-5v5"/>',
@@ -35,17 +40,12 @@ function searchableText(...values) {
   return values.join(' ').toLocaleLowerCase('pt-PT');
 }
 
-const crops = [
-  { name: 'Olival tradicional', field: 'Quinta da Ribeira', type: 'Oliveira · Arbequina', emoji: '🫒', progress: 72, date: 'Por definir', tone: '' },
-  { name: 'Vinha do norte', field: 'Herdade do Vale', type: 'Videira · Touriga Nacional', emoji: '🍇', progress: 54, date: 'Por definir', tone: 'purple' },
-  { name: 'Horta de verão', field: 'Campo Novo', type: 'Tomate · Coração de boi', emoji: '🍅', progress: 38, date: 'Por definir', tone: 'orange' }
-];
-
-const fields = [
-  { name: 'Quinta da Ribeira', place: 'Santarém · Ribatejo', area: '12,4 ha', crop: 'Olival tradicional', tone: '' },
-  { name: 'Herdade do Vale', place: 'Évora · Alentejo', area: '8,2 ha', crop: 'Vinha do norte', tone: 'gold' },
-  { name: 'Campo Novo', place: 'Leiria · Oeste', area: '4,2 ha', crop: 'Horta de verão', tone: 'blue' }
-];
+function formatDate(value) {
+  const date = new Date(`${value}T12:00:00`);
+  return Number.isNaN(date.getTime())
+    ? value
+    : new Intl.DateTimeFormat('pt-PT', { day: '2-digit', month: '2-digit', year: 'numeric' }).format(date);
+}
 
 function heading(kicker, title, description, action = '') {
   return `<div class="page-heading"><div><span class="eyebrow">${kicker}</span><h1>${title}</h1><p>${description}</p></div>${action}</div>`;
@@ -54,37 +54,27 @@ function heading(kicker, title, description, action = '') {
 function taskRow(task) {
   return `<div class="task-row${task.completed ? ' is-complete' : ''}" data-task-id="${escapeHTML(task.id)}" data-searchable="${escapeHTML(searchableText(task.name, task.field))}">
     <input class="task-check" type="checkbox" aria-label="Marcar ${escapeHTML(task.name)} como concluída"${task.completed ? ' checked' : ''}>
-    <div class="task-copy"><strong>${escapeHTML(task.name)}</strong><span>${escapeHTML(task.field)}</span></div>
+    <div class="task-copy"><strong>${escapeHTML(task.name)}${task.demo ? '<small class="demo-badge">Demonstração</small>' : ''}</strong><span>${escapeHTML(task.field)}</span></div>
     <span class="task-date${task.today ? ' today' : task.overdue ? ' overdue' : ''}">${escapeHTML(task.dueLabel)}</span>
   </div>`;
-}
-
-function chart() {
-  return `<div class="chart-area">
-    <div class="chart-legend"><span><i class="legend-dot"></i>Esta semana</span><span><i class="legend-dot muted"></i>Semana anterior</span></div>
-    <svg class="chart" viewBox="0 0 600 190" role="img" aria-label="Gráfico ilustrativo da atividade semanal, de segunda-feira a domingo">
-      <defs><linearGradient id="chartFill" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="#6e9b72" stop-opacity=".18"/><stop offset="1" stop-color="#6e9b72" stop-opacity="0"/></linearGradient></defs>
-      <path class="grid-line" d="M42 25H590M42 65H590M42 105H590M42 145H590"/>
-      <text x="3" y="28">12</text><text x="8" y="68">8</text><text x="8" y="108">4</text><text x="12" y="148">0</text>
-      <path d="M50 125 C87 120 101 83 139 92 S196 119 227 88 S286 57 316 72 S374 106 405 70 S462 41 493 58 S550 44 580 32" fill="none" stroke="#d2e0d0" stroke-width="2" stroke-dasharray="4 5"/>
-      <path class="area-fill" d="M50 112 C86 104 100 70 139 78 S194 105 227 67 S286 50 316 63 S374 90 405 54 S462 37 493 48 S550 37 580 24 V151 H50Z"/>
-      <path class="chart-line" d="M50 112 C86 104 100 70 139 78 S194 105 227 67 S286 50 316 63 S374 90 405 54 S462 37 493 48 S550 37 580 24"/>
-      <circle class="chart-point" cx="50" cy="112" r="3.5"/><circle class="chart-point" cx="139" cy="78" r="3.5"/><circle class="chart-point" cx="227" cy="67" r="3.5"/><circle class="chart-point" cx="316" cy="63" r="3.5"/><circle class="chart-point" cx="405" cy="54" r="3.5"/><circle class="chart-point" cx="493" cy="48" r="3.5"/><circle class="chart-point" cx="580" cy="24" r="3.5"/>
-      <text x="46" y="174">Seg</text><text x="134" y="174">Ter</text><text x="222" y="174">Qua</text><text x="310" y="174">Qui</text><text x="399" y="174">Sex</text><text x="487" y="174">Sáb</text><text x="574" y="174">Dom</text>
-    </svg>
-  </div><div class="panel-footer"><span>Atividades agrícolas concluídas</span><strong>+12% esta semana</strong></div>`;
 }
 
 function metric(iconName, tone, label, number, unit, note) {
   return `<article class="metric-card"><div class="metric-top"><span class="metric-label">${label}</span><span class="metric-icon ${tone}">${icon(iconName)}</span></div><div class="metric-number">${number}<small>${unit}</small></div><div class="metric-note">${note}</div></article>`;
 }
 
-function fieldCard(field) {
-  return `<article class="field-card" data-searchable="${escapeHTML(searchableText(field.name, field.place, field.area, field.crop))}"><div class="field-illustration ${field.tone}"><span class="field-tag">EM PRODUÇÃO</span></div><div class="field-body"><div class="field-title-row"><h2>${escapeHTML(field.name)}</h2><span>${escapeHTML(field.area)}</span></div><p>${escapeHTML(field.place)}</p><div class="field-stats"><div><span>Cultura principal</span><strong>${escapeHTML(field.crop)}</strong></div><div><span>Estado</span><strong>Saudável</strong></div></div></div></article>`;
+function fieldCard(field, state) {
+  const parcelCount = state.records.parcelas.filter((parcel) => parcel.fieldId === field.id).length;
+  const tag = field.demo ? 'DADOS DE DEMONSTRAÇÃO' : field.status;
+  return `<article class="field-card" data-searchable="${escapeHTML(searchableText(field.name, field.place, field.area, field.crop, field.status))}"><div class="field-illustration ${escapeHTML(field.tone)}"><span class="field-tag">${escapeHTML(tag)}</span></div><div class="field-body"><div class="field-title-row"><h2>${escapeHTML(field.name)}</h2><span>${escapeHTML(field.area)}</span></div><p>${escapeHTML(field.place)}</p><div class="field-stats"><div><span>Cultura principal</span><strong>${escapeHTML(field.crop)}</strong></div><div><span>Parcelas</span><strong>${parcelCount}</strong></div></div><div class="record-actions"><button class="button button-quiet" type="button" data-action="edit-field" data-field-id="${escapeHTML(field.id)}">Editar</button><button class="button button-quiet record-delete" type="button" data-action="delete-field" data-field-id="${escapeHTML(field.id)}">Eliminar</button></div></div></article>`;
 }
 
-function cropCard(crop) {
-  return `<article class="crop-card" data-searchable="${escapeHTML(searchableText(crop.name, crop.field, crop.type))}"><div class="crop-body"><div class="crop-top"><span class="crop-emoji ${crop.tone}">${crop.emoji}</span><div><h2 class="crop-title">${escapeHTML(crop.name)}</h2><small>${escapeHTML(crop.type)}</small></div></div><p>${escapeHTML(crop.field)}</p><div class="progress-label"><span>Progresso da época</span><strong>${crop.progress}%</strong></div><div class="progress-track"><div class="progress-value" style="width:${crop.progress}%"></div></div><div class="crop-meta"><span>Próximo marco</span><strong>${escapeHTML(crop.date)}</strong></div></div></article>`;
+function cropCard(crop, state) {
+  const parcel = state.records.parcelas.find((item) => item.id === crop.parcelId);
+  const field = parcel && state.fields.find((item) => item.id === parcel.fieldId);
+  const location = parcel ? `${parcel.name}${field ? ` · ${field.name}` : ''}` : 'Parcela não indicada';
+  const plantingDate = formatDate(crop.plantingDate);
+  return `<article class="crop-card" data-record-id="${escapeHTML(crop.id)}" data-searchable="${escapeHTML(searchableText(crop.name, crop.type, location, crop.status))}"><div class="crop-body"><div class="crop-top"><span class="crop-emoji">${icon('leaf')}</span><div><h2 class="crop-title">${escapeHTML(crop.name)}</h2><small>${escapeHTML(crop.type)}</small></div></div><p>${escapeHTML(location)}</p><div class="crop-meta"><span>Estado</span><strong>${escapeHTML(crop.status)}</strong></div><div class="crop-meta"><span>Plantação</span><strong>${escapeHTML(plantingDate)}</strong></div><div class="crop-meta"><span>Produção prevista</span><strong>${escapeHTML(crop.expectedProduction || 'Não indicada')}</strong></div><div class="record-actions"><button class="button button-quiet" type="button" data-action="edit-record" data-module="culturas">Editar</button><button class="button button-quiet record-delete" type="button" data-action="delete-record" data-module="culturas">Eliminar</button></div></div></article>`;
 }
 
 function renderDashboard(state) {
@@ -94,42 +84,57 @@ function renderDashboard(state) {
     .filter((task) => !task.completed)
     .sort((a, b) => a.dueDate.localeCompare(b.dueDate))
     .slice(0, 4);
+  const livestock = state.records.animais.reduce((total, record) => total + (Number(record.quantity) || 0), 0);
+  const expenses = state.records.financas.filter((record) => record.type === 'Despesa')
+    .reduce((total, record) => total + (Number(record.value) || 0), 0);
+  const revenue = state.records.financas.filter((record) => record.type === 'Receita')
+    .reduce((total, record) => total + (Number(record.value) || 0), 0);
+  const balance = (revenue - expenses).toLocaleString('pt-PT', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const recentNotes = [...state.records.caderno].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 4);
+  const hasDemoData = state.fields.some((field) => field.demo) || state.tasks.some((task) => task.demo);
   const date = new Intl.DateTimeFormat('pt-PT', { weekday: 'long', day: 'numeric', month: 'long' }).format(new Date());
   const today = date.charAt(0).toLocaleUpperCase('pt-PT') + date.slice(1);
   return `${heading(today.toLocaleUpperCase('pt-PT'), 'Painel geral', 'Um olhar simples sobre o que está a acontecer na tua exploração.', '<button class="button button-primary" type="button" data-action="new-activity">' + icon('plus') + 'Nova atividade</button>')}
-    <section class="welcome-banner"><div class="welcome-copy"><span class="eyebrow">A TUA EXPLORAÇÃO, NUM SÓ LUGAR</span><h2>Bom dia, agricultor.</h2><p>As tuas culturas estão a crescer bem. Aqui tens o resumo do que merece a tua atenção hoje.</p></div><div class="weather-summary"><span class="weather-sun">${icon('sun')}</span><div class="weather-text"><strong>22°</strong><span>Sol com nuvens</span></div><div class="weather-extra">10%<br>prob. chuva</div></div></section>
+    ${hasDemoData ? '<p class="demo-notice">Os registos marcados como demonstração são exemplos e não representam dados reais da tua exploração.</p>' : ''}
+    <section class="welcome-banner"><div class="welcome-copy"><span class="eyebrow">A TUA EXPLORAÇÃO, NUM SÓ LUGAR</span><h2>Bem-vindo ao AGRO360.</h2><p>Consulta os dados registados e acompanha tarefas, culturas e movimentos financeiros num só lugar.</p></div><section class="weather-summary" aria-label="Meteorologia atual"><span class="weather-sun" id="weather-icon">${icon('sun')}</span><div class="weather-text"><strong id="weather-temperature">--°C</strong><span id="weather-condition" role="status">A carregar meteorologia...</span><label class="weather-location-label" for="weather-field"><span class="visually-hidden">Exploração para consultar</span><select id="weather-field" aria-label="Exploração para consultar meteorologia">${state.fields.map((field) => `<option value="${escapeHTML(field.id)}"${field.id === state.weatherFieldId ? ' selected' : ''}>${escapeHTML(field.name)}</option>`).join('')}</select></label><small class="weather-updated"><span id="weather-updated">A consultar dados atuais</span> · <a href="https://open-meteo.com/" target="_blank" rel="noopener noreferrer">Open-Meteo</a></small></div><div class="weather-extra"><span id="weather-precipitation">--%</span><br>prob. chuva<button class="weather-refresh" id="weather-refresh" type="button" aria-label="Atualizar meteorologia" title="Atualizar meteorologia">${icon('refresh')}</button></div></section></section>
     <section class="metrics-grid" aria-label="Resumo da exploração">
-      ${metric('land', 'green', 'Área gerida', '24,8', 'ha', '<span class="positive">3 explorações</span> registadas')}
-      ${metric('leaf', 'gold', 'Culturas ativas', '3', 'culturas', '<span class="positive">Em desenvolvimento</span>')}
-      ${metric('calendar', 'blue', 'Tarefas pendentes', String(pending), 'tarefas', pendingToday ? `<span class="highlight">${pendingToday} ${pendingToday === 1 ? 'tarefa' : 'tarefas'} para hoje</span> na exploração` : 'Sem tarefas previstas para hoje')}
-      ${metric('sprout', 'rose', 'Próxima colheita', '—', 'data', 'Previsão por registar')}
+      ${metric('land', 'green', 'Explorações', String(state.fields.length), 'registos', 'Propriedades registadas')}
+      ${metric('land', 'gold', 'Parcelas', String(state.records.parcelas.length), 'registos', 'Parcelas associadas')}
+      ${metric('leaf', 'green', 'Culturas', String(state.records.culturas.length), 'registos', 'Culturas registadas')}
+      ${metric('calendar', 'blue', 'Tarefas pendentes', String(pending), 'tarefas', pendingToday ? `<span class="highlight">${pendingToday} ${pendingToday === 1 ? 'tarefa' : 'tarefas'} para hoje</span>` : 'Sem tarefas para hoje')}
+      ${metric('animal', 'gold', 'Animais', String(livestock), 'animais', `${state.records.animais.length} registos de pecuária`)}
+      ${metric('machine', 'blue', 'Máquinas', String(state.records.maquinas.length), 'registos', 'Equipamentos registados')}
+      ${metric('people', 'green', 'Funcionários', String(state.records.funcionarios.length), 'registos', 'Elementos registados')}
+      ${metric('stock', 'rose', 'Saldo registado', balance, '€', `${revenue.toLocaleString('pt-PT', { minimumFractionDigits: 2 })} € receitas · ${expenses.toLocaleString('pt-PT', { minimumFractionDigits: 2 })} € despesas`)}
     </section>
     <section class="module-shortcuts" aria-labelledby="module-shortcuts-title">
       <div class="section-heading"><div><span class="eyebrow">GESTÃO DA EXPLORAÇÃO</span><h2 id="module-shortcuts-title">As tuas áreas</h2></div></div>
       <div class="module-shortcuts-grid">${[
-        { id: 'maquinas', ...recordModules.maquinas },
-        { id: 'animais', ...recordModules.animais },
         { id: 'exploracoes', title: 'Explorações', description: 'Talhões e terrenos', icon: 'land' },
-        { id: 'culturas', title: 'Culturas', description: 'Talhões e desenvolvimento', icon: 'leaf' },
-        { id: 'stock', ...recordModules.stock },
-        { id: 'funcionarios', ...recordModules.funcionarios },
+        ...Object.entries(recordModules).map(([id, module]) => ({ id, ...module })),
         { id: 'atividades', title: 'Atividades', description: 'Planeamento e tarefas', icon: 'calendar' }
       ].map((module) => `<a class="module-shortcut" href="#${module.id}" data-view="${module.id}"><span class="module-shortcut-icon">${icon(module.icon)}</span><span class="module-shortcut-copy"><strong>${escapeHTML(module.title)}</strong><small>${escapeHTML(module.description)}</small></span><span class="module-shortcut-arrow">${icon('arrow')}</span></a>`).join('')}</div>
     </section>
     <section class="dashboard-grid">
-      <article class="panel"><div class="panel-header"><div><h2>Ritmo da exploração</h2><p>Atividades realizadas ao longo da semana</p></div><a class="text-link" href="#atividades" data-view="atividades">Ver atividades ${icon('arrow')}</a></div>${chart()}</article>
+      <article class="panel"><div class="panel-header"><div><h2>Atividade recente</h2><p>Últimos registos do caderno de campo</p></div><a class="text-link" href="#caderno" data-view="caderno">Ver caderno ${icon('arrow')}</a></div><div class="tasks-list">${recentNotes.length ? recentNotes.map((note) => {
+        const parcel = state.records.parcelas.find((item) => item.id === note.parcelId);
+        const field = parcel && state.fields.find((item) => item.id === parcel.fieldId);
+        const dateLabel = formatDate(note.date);
+        return `<div class="task-row"><span class="activity-date">${escapeHTML(dateLabel)}</span><div class="task-copy"><strong>${escapeHTML(note.activity)}</strong><span>${escapeHTML(parcel ? `${parcel.name}${field ? ` · ${field.name}` : ''}` : 'Parcela removida')}</span></div></div>`;
+      }).join('') : '<div class="empty-state"><strong>Sem atividade registada</strong>Os registos do caderno de campo vão aparecer aqui.</div>'}</div></article>
       <article class="panel"><div class="panel-header"><div><h2>Para fazer</h2><p>As próximas tarefas da tua lista</p></div><a class="text-link" href="#atividades" data-view="atividades">Ver todas ${icon('arrow')}</a></div><div class="tasks-list">${tasks.length ? tasks.map(taskRow).join('') : '<div class="empty-state"><strong>Tudo em dia!</strong>Não tens tarefas pendentes.</div>'}</div></article>
     </section>`;
 }
 
-function renderFields() {
-  return `${heading('A TUA TERRA', 'Explorações', 'Conhece os teus campos e acompanha cada parcela.', '<button class="button button-primary" type="button" data-action="new-activity">' + icon('plus') + 'Nova atividade</button>')}
-    <section class="section-grid" aria-label="Lista de explorações">${fields.map(fieldCard).join('')}</section>`;
+function renderFields(state) {
+  return `${heading('A TUA TERRA', 'Explorações', 'Conhece os teus campos e acompanha cada parcela.', '<button class="button button-primary" type="button" data-action="new-field">' + icon('plus') + 'Nova exploração</button>')}
+    <section class="section-grid" aria-label="Lista de explorações">${state.fields.map((field) => fieldCard(field, state)).join('') || '<div class="empty-state"><strong>Ainda sem explorações</strong>Adiciona a primeira exploração para começar.</div>'}</section>`;
 }
 
-function renderCrops() {
-  return `${heading('CICLO AGRÍCOLA', 'Culturas', 'Acompanha o desenvolvimento e os próximos marcos de cada cultura.')}
-    <section class="section-grid" aria-label="Lista de culturas">${crops.map(cropCard).join('')}</section>`;
+function renderCrops(state) {
+  const crops = state.records.culturas;
+  return `${heading('CICLO AGRÍCOLA', 'Culturas', 'Acompanha as culturas associadas às parcelas.', `<button class="button button-primary" type="button" data-action="new-record" data-module="culturas">${icon('plus')}Adicionar cultura</button>`)}
+    <section class="section-grid" aria-label="Lista de culturas">${crops.map((crop) => cropCard(crop, state)).join('') || '<div class="empty-state"><strong>Ainda sem culturas registadas</strong>Adiciona uma parcela antes de registar uma cultura.</div>'}</section>`;
 }
 
 function renderActivities(state) {
@@ -138,17 +143,33 @@ function renderActivities(state) {
     const dateParts = task.dueLabel.split(' ');
     const status = task.completed ? 'done' : task.overdue ? 'late' : '';
     const statusText = task.completed ? 'Concluída' : task.overdue ? 'Atrasada' : task.today ? 'Hoje' : 'Planeada';
-    return `<div class="activity-row" data-task-id="${escapeHTML(task.id)}" data-searchable="${escapeHTML(searchableText(task.name, task.field))}"><div class="activity-date"><strong>${escapeHTML(dateParts[0] || '—')}</strong><span>${escapeHTML(dateParts[1] || '')}</span></div><div class="activity-details"><strong>${escapeHTML(task.name)}</strong><span>${escapeHTML(task.field)}</span></div><label class="activity-status ${status}"><input class="task-check" type="checkbox" aria-label="Marcar ${escapeHTML(task.name)} como concluída"${task.completed ? ' checked' : ''}> ${statusText}</label></div>`;
+    return `<div class="activity-row" data-task-id="${escapeHTML(task.id)}" data-searchable="${escapeHTML(searchableText(task.name, task.field))}"><div class="activity-date"><strong>${escapeHTML(dateParts[0] || '—')}</strong><span>${escapeHTML(dateParts[1] || '')}</span></div><div class="activity-details"><strong>${escapeHTML(task.name)}${task.demo ? '<small class="demo-badge">Demonstração</small>' : ''}</strong><span>${escapeHTML(task.field)}</span></div><label class="activity-status ${status}"><input class="task-check" type="checkbox" aria-label="Marcar ${escapeHTML(task.name)} como concluída"${task.completed ? ' checked' : ''}> ${statusText}</label><div class="task-actions"><button class="button button-quiet" type="button" data-action="edit-task">Editar</button><button class="button button-quiet record-delete" type="button" data-action="delete-task">Eliminar</button></div></div>`;
   }).join('');
   return `${heading('PLANEAMENTO', 'Atividades', 'Uma lista clara para saberes sempre o que vem a seguir.', '<button class="button button-primary" type="button" data-action="new-activity">' + icon('plus') + 'Nova atividade</button>')}
     <section class="panel activity-panel"><div class="panel-header"><div><h2>Agenda da exploração</h2><p>${state.tasks.length} atividades registadas</p></div><span class="task-date">${state.tasks.filter((task) => !task.completed).length} pendentes</span></div>${rows || '<div class="empty-state">Ainda não tens atividades registadas.</div>'}</section>`;
 }
 
-function recordValue(moduleId, field, record) {
+function recordValue(moduleId, field, record, state) {
   const value = record[field.name];
   if (!value) return 'Não indicado';
+  if (field.name === 'fieldId') return state.fields.find((item) => item.id === value)?.name || 'Exploração não encontrada';
+  if (field.name === 'parcelId') {
+    const parcel = state.records.parcelas.find((item) => item.id === value);
+    if (!parcel) return 'Parcela não encontrada';
+    const fieldRecord = state.fields.find((item) => item.id === parcel.fieldId);
+    return `${parcel.name}${fieldRecord ? ` · ${fieldRecord.name}` : ''}`;
+  }
   if (moduleId === 'stock' && field.name === 'value') {
     return `${Number(value).toLocaleString('pt-PT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €`;
+  }
+  if (moduleId === 'financas' && field.name === 'value') {
+    return `${Number(value).toLocaleString('pt-PT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €`;
+  }
+  if (moduleId === 'parcelas' && field.name === 'area') {
+    return `${Number(value).toLocaleString('pt-PT', { maximumFractionDigits: 2 })} ha`;
+  }
+  if (field.type === 'date') {
+    return formatDate(value);
   }
   if (moduleId === 'stock' && field.name === 'quantity') return `${value} ${record.unit}`;
   return value;
@@ -158,8 +179,8 @@ function renderRecords(moduleId, state) {
   const module = recordModules[moduleId];
   const records = state.records[moduleId];
   const entries = records.map((record) => {
-    const searchable = searchableText(...module.fields.map((field) => record[field.name]));
-    const details = module.fields.map((field) => `<div class="record-detail"><span>${escapeHTML(field.label)}</span><strong>${escapeHTML(recordValue(moduleId, field, record))}</strong></div>`).join('');
+    const searchable = searchableText(...module.fields.map((field) => recordValue(moduleId, field, record, state)));
+    const details = module.fields.map((field) => `<div class="record-detail"><span>${escapeHTML(field.label)}</span><strong>${escapeHTML(recordValue(moduleId, field, record, state))}</strong></div>`).join('');
     return `<article class="record-card" data-record-id="${escapeHTML(record.id)}" data-searchable="${escapeHTML(searchable)}">
       <div class="record-card-content">${details}</div>
       <div class="record-actions"><button class="button button-quiet" type="button" data-action="edit-record" data-module="${moduleId}">Editar</button><button class="button button-quiet record-delete" type="button" data-action="delete-record" data-module="${moduleId}">Eliminar</button></div>
@@ -173,8 +194,8 @@ function renderRecords(moduleId, state) {
 }
 
 export function renderView(view, state) {
-  if (view === 'exploracoes') return renderFields();
-  if (view === 'culturas') return renderCrops();
+  if (view === 'exploracoes') return renderFields(state);
+  if (view === 'culturas') return renderCrops(state);
   if (view === 'atividades') return renderActivities(state);
   if (Object.hasOwn(recordModules, view)) return renderRecords(view, state);
   return renderDashboard(state);

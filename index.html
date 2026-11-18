@@ -13,7 +13,7 @@
   </head>
   <body>
     <div class="app-shell">
-      <aside class="sidebar" aria-label="Navegação principal">
+      <aside class="sidebar" id="main-sidebar" aria-label="Navegação principal">
         <a class="brand" href="index.html" aria-label="AGRO360 — início">
           <img src="assets/images/logo.svg" alt="" width="40" height="40">
           <span class="brand-copy"><strong>AGRO<span>360</span></strong><small>GESTÃO AGRÍCOLA</small></span>
@@ -22,8 +22,11 @@
         <nav class="primary-nav">
           <a class="nav-link is-active" href="#dashboard" data-view="dashboard" aria-current="page"><span class="nav-icon" data-icon="grid"></span><span>Painel geral</span></a>
           <a class="nav-link" href="#exploracoes" data-view="exploracoes"><span class="nav-icon" data-icon="land"></span><span>Explorações</span></a>
+          <a class="nav-link" href="#parcelas" data-view="parcelas"><span class="nav-icon" data-icon="land"></span><span>Parcelas</span></a>
           <a class="nav-link" href="#culturas" data-view="culturas"><span class="nav-icon" data-icon="leaf"></span><span>Culturas</span></a>
+          <a class="nav-link" href="#caderno" data-view="caderno"><span class="nav-icon" data-icon="calendar"></span><span>Caderno de campo</span></a>
           <a class="nav-link" href="#atividades" data-view="atividades"><span class="nav-icon" data-icon="calendar"></span><span>Atividades</span><span class="nav-count" id="pending-count">6</span></a>
+          <a class="nav-link" href="#financas" data-view="financas"><span class="nav-icon" data-icon="stock"></span><span>Custos e receitas</span></a>
           <a class="nav-link" href="#maquinas" data-view="maquinas"><span class="nav-icon" data-icon="machine"></span><span>Máquinas</span></a>
           <a class="nav-link" href="#animais" data-view="animais"><span class="nav-icon" data-icon="animal"></span><span>Animais</span></a>
           <a class="nav-link" href="#stock" data-view="stock"><span class="nav-icon" data-icon="stock"></span><span>Stock e Finanças</span></a>
@@ -37,7 +40,9 @@
       </aside>
       <main class="main-area">
         <header class="topbar">
-          <div class="breadcrumbs"><span>AGRO360</span><span class="crumb-divider">/</span><strong id="current-section">Painel geral</strong></div>
+          <div class="breadcrumbs">
+            <span>AGRO360</span><span class="crumb-divider">/</span><strong id="current-section">Painel geral</strong>
+          </div>
           <div class="topbar-actions">
             <label class="search-box"><span data-icon="search"></span><input id="global-search" type="search" placeholder="Pesquisar..." aria-label="Pesquisar na página"><kbd>Ctrl K</kbd></label>
             <span class="topbar-divider" aria-hidden="true"></span>
@@ -51,13 +56,21 @@
     <nav class="mobile-nav" aria-label="Navegação móvel">
       <a class="mobile-nav-link is-active" href="#dashboard" data-view="dashboard" aria-label="Painel geral"><span data-icon="grid"></span><small>Painel</small></a>
       <a class="mobile-nav-link" href="#exploracoes" data-view="exploracoes" aria-label="Explorações"><span data-icon="land"></span><small>Campos</small></a>
+      <a class="mobile-nav-link" href="#parcelas" data-view="parcelas" aria-label="Parcelas"><span data-icon="land"></span><small>Parcelas</small></a>
       <a class="mobile-nav-link" href="#culturas" data-view="culturas" aria-label="Culturas"><span data-icon="leaf"></span><small>Culturas</small></a>
+      <a class="mobile-nav-link" href="#caderno" data-view="caderno" aria-label="Caderno de campo"><span data-icon="calendar"></span><small>Caderno</small></a>
       <a class="mobile-nav-link" href="#atividades" data-view="atividades" aria-label="Atividades"><span data-icon="calendar"></span><small>Tarefas</small></a>
+      <a class="mobile-nav-link" href="#financas" data-view="financas" aria-label="Custos e receitas"><span data-icon="stock"></span><small>Finanças</small></a>
+      <a class="mobile-nav-link" href="#maquinas" data-view="maquinas" aria-label="Máquinas"><span data-icon="machine"></span><small>Máquinas</small></a>
+      <a class="mobile-nav-link" href="#animais" data-view="animais" aria-label="Animais"><span data-icon="animal"></span><small>Animais</small></a>
+      <a class="mobile-nav-link" href="#stock" data-view="stock" aria-label="Stock"><span data-icon="stock"></span><small>Stock</small></a>
+      <a class="mobile-nav-link" href="#funcionarios" data-view="funcionarios" aria-label="Funcionários"><span data-icon="people"></span><small>Equipa</small></a>
     </nav>
     <div class="modal-backdrop" id="activity-modal" hidden>
       <section class="dialog" role="dialog" aria-modal="true" aria-labelledby="modal-title">
         <div class="dialog-heading"><div><span class="eyebrow">ORGANIZA A EXPLORAÇÃO</span><h2 id="modal-title">Nova atividade</h2></div><button class="icon-button close-modal" type="button" aria-label="Fechar"><span data-icon="close"></span></button></div>
         <form id="activity-form">
+          <input type="hidden" id="activity-id" name="id">
           <label class="field-label" for="activity-name">O que é preciso fazer?</label>
           <input class="form-input" id="activity-name" name="name" maxlength="70" placeholder="Ex.: Verificar sistema de rega" required>
           <label class="field-label" for="activity-field">Exploração</label>
@@ -72,6 +85,7 @@
       <section class="dialog" role="dialog" aria-modal="true" aria-labelledby="field-modal-title">
         <div class="dialog-heading"><div><span class="eyebrow">A TUA TERRA</span><h2 id="field-modal-title">Nova exploração</h2></div><button class="icon-button close-field-modal" type="button" aria-label="Fechar"><span data-icon="close"></span></button></div>
         <form id="field-form">
+          <input type="hidden" id="field-id" name="id">
           <label class="field-label" for="field-name">Nome da exploração</label>
           <input class="form-input" id="field-name" name="name" maxlength="70" placeholder="Ex.: Quinta do Pinhal" required>
           <label class="field-label" for="field-place">Localidade e região</label>
