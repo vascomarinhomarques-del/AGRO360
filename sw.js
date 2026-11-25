@@ -1,4 +1,4 @@
-const CACHE_NAME = 'agro360-shell-v14';
+const CACHE_NAME = 'agro360-shell-v15';
 const APP_SHELL = [
   './',
   './index.html',
@@ -11,6 +11,8 @@ const APP_SHELL = [
   './assets/js/bootstrap.js',
   './assets/js/app.js',
   './assets/js/login.js',
+  './assets/js/db.js',
+  './assets/js/modules/api.js',
   './assets/js/modules/UI.js',
   './assets/js/modules/records.js',
   './assets/js/modules/fields.js',
